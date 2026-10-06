@@ -1,13 +1,16 @@
 import streamlit as st
 import pandas as pd
 import json
+import tempfile
+import os
+from google import genai
+from google.genai import types
 
 # ==========================================
 # 1. PAGE SETUP & PRINT STYLING
 # ==========================================
 st.set_page_config(layout="wide", page_title="HGDG Assessment Tool")
 
-# This CSS hides the sidebar and menus when you print (Ctrl+P / Cmd+P)
 hide_elements_during_print = """
     <style>
     @media print {
@@ -56,87 +59,149 @@ sector_guidelines = {
 with st.sidebar:
     st.header("Project Input")
     
+    api_key = st.text_input("Gemini API Key", type="password")
+    
     selected_sector = st.selectbox(
         "Select HGDG Sector",
         options=list(sector_guidelines.keys())
     )
     
     project_title = st.text_input("Project Title")
-    project_text = st.text_area("Paste Project Proposal Text Here", height=250)
+    project_text = st.text_area("Paste Project Proposal Text Here", height=200)
     
-    st.subheader("Additional Context")
-    reference_text = st.text_area("Paste Additional Local Memos/Ordinances (Optional)", height=150)
+    st.subheader("Reference Materials")
+    # NEW: Document Uploader!
+    uploaded_files = st.file_uploader(
+        "Upload Guidelines (e.g., GEWE Indicators PDF)", 
+        type=["pdf", "txt"], 
+        accept_multiple_files=True,
+        help="The AI will read these documents to help score the proposal."
+    )
+    
+    reference_text = st.text_area("Paste Additional Short Memos (Optional)", height=100)
     
     analyze_btn = st.button("Generate HGDG Checklist")
 
 # ==========================================
-# 4. REPORT GENERATION & OUTPUT
+# 4. AI LOGIC & REPORT GENERATION
 # ==========================================
-if analyze_btn and project_text:
-    
-    # 4a. Logic prep for the future AI connection
-    active_sector_rules = sector_guidelines[selected_sector]
-    
-    # We display a quick success message (this won't show up on the printed page)
-    st.success(f"Successfully loaded specific guidelines for: **{selected_sector}**")
-    st.divider()
-    
-    # 4b. Mock LLM JSON Response (This layout perfectly maps to the Box 7 requirements)
-    mock_llm_json = """
-    {
-      "elements": [
-        {"element_number": 1, "element_name": "Involvement of women and men in project conceptualization and design", "response": "Yes", "score": 2.0, "result_comment": "Consultations included both male and female stakeholders."},
-        {"element_number": 2, "element_name": "Collection of sex-disaggregated data and gender-related information at the planning stage", "response": "Partly yes", "score": 1.0, "result_comment": "Some demographic data included, but lacks detailed gender constraints analysis."},
-        {"element_number": 3, "element_name": "Conduct of gender analysis and identification of gender issues at the project identification stage", "response": "Yes", "score": 2.0, "result_comment": "Clear identification of gender gaps based on the proposal text."},
-        {"element_number": 4, "element_name": "Presence of gender equality goals, outcomes, and outputs", "response": "Yes", "score": 2.0, "result_comment": "Specific goals mapped to women's empowerment."},
-        {"element_number": 5, "element_name": "Presence of activities and interventions that match the gender issues identified", "response": "Yes", "score": 2.0, "result_comment": "Activities specifically target identified gender gaps."},
-        {"element_number": 6, "element_name": "Gender analysis of the likely impact of the designed project", "response": "Partly yes", "score": 1.34, "result_comment": "Analyzed positive impacts but missed potential negative impact mitigation."},
-        {"element_number": 7, "element_name": "Presence of monitoring targets and indicators", "response": "Yes", "score": 2.0, "result_comment": "Specific, time-bound targets included."},
-        {"element_number": 8, "element_name": "Provision for the collection of sex-disaggregated data in the M&E plan", "response": "Yes", "score": 2.0, "result_comment": "M&E explicitly requires sex-disaggregated tracking."},
-        {"element_number": 9, "element_name": "Commitment of resources to address gender issues", "response": "Yes", "score": 2.0, "result_comment": "GAD budget allocation meets the standard requirements."},
-        {"element_number": 10, "element_name": "Inclusion of plans to coordinate/relate with the agency's GAD efforts", "response": "Yes", "score": 2.0, "result_comment": "Aligned with the broader municipal GAD action plan."}
-      ],
-      "total_score": 18.34,
-      "interpretation": "Proposed project is gender-responsive"
-    }
-    """
-    
-    data = json.loads(mock_llm_json)
-    
-    # 4c. Printable Report Header
-    st.subheader(f"Evaluation Report: {project_title}")
-    st.write(f"**Sector Evaluated:** {selected_sector}")
-    st.write("---")
-    
-    # 4d. Render the Box 7 Table
-    st.markdown("### Summary Checklist for the Assessment of Proposed Projects")
-    df = pd.DataFrame(data["elements"])
-    df = df[["element_number", "element_name", "response", "score", "result_comment"]]
-    df.columns = ["No.", "Element or Requirement", "Response", "Score", "Result / Comments"]
-    
-    st.table(df)
-    
-    # 4e. Render the Summary Scores & Budget Attribution
-    st.write("---")
-    st.markdown("### Summary of Scores")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric(label="Total GAD Score (Max 20)", value=data["total_score"])
-    with col2:
-        st.metric(label="Interpretation", value=data["interpretation"])
-
-    # Calculate GAD Budget Attribution
-    score = data["total_score"]
-    if score < 4.0:
-        attribution = "0%"
-    elif 4.0 <= score <= 7.9:
-        attribution = "25%"
-    elif 8.0 <= score <= 14.9:
-        attribution = "50%"
-    elif 15.0 <= score <= 19.9:
-        attribution = "75%"
-    else:
-        attribution = "100%"
+if analyze_btn:
+    if not api_key:
+        st.error("Please enter your Gemini API Key in the sidebar.")
+        st.stop()
+    if not project_text:
+        st.error("Please paste a project proposal.")
+        st.stop()
         
-    st.info(f"**GAD Budget Attribution:** {attribution} of the total project cost.")
+    with st.spinner("Reading documents and analyzing proposal... This may take 15-30 seconds."):
+        try:
+            client = genai.Client(api_key=api_key)
+            active_sector_rules = sector_guidelines[selected_sector]
+            
+            # --- NEW: Process Uploaded Files ---
+            gemini_uploaded_files = []
+            if uploaded_files:
+                for uploaded_file in uploaded_files:
+                    # Save the uploaded file temporarily so the API can read it
+                    file_extension = ".pdf" if uploaded_file.name.endswith(".pdf") else ".txt"
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
+                        temp_file.write(uploaded_file.read())
+                        temp_path = temp_file.name
+                    
+                    # Upload it to Gemini's secure file storage
+                    g_file = client.files.upload(file=temp_path)
+                    gemini_uploaded_files.append(g_file)
+                    
+                    # Clean up the temporary file from the local server
+                    os.remove(temp_path)
+            
+            # Build the strict prompt
+            final_prompt = f"""
+            You are an expert evaluator for the Department of the Interior and Local Government (DILG).
+            Evaluate the provided local government project proposal using the Harmonized Gender and Development Guidelines (HGDG).
+            
+            If any reference files (like GEWE Indicators) were provided, you must actively cross-reference them to inform your scoring and justifications.
+            
+            Evaluate against the 10 core elements of the HGDG Box 7. Assign a score of 0 (No), a partial score (Partly Yes), or the maximum score (Yes).
+            
+            Sector Specific Rules to Apply:
+            {active_sector_rules}
+            
+            Additional Context:
+            {reference_text}
+            
+            Project Proposal:
+            {project_text}
+            
+            You MUST output your evaluation in valid JSON format with this EXACT structure:
+            {{
+              "elements": [
+                {{
+                  "element_number": 1,
+                  "element_name": "Involvement of women and men in project conceptualization and design",
+                  "response": "Yes / Partly yes / No",
+                  "score": 2.0,
+                  "result_comment": "Brief justification based on the text..."
+                }}
+              ],
+              "total_score": 18.5,
+              "interpretation": "Gender-responsive"
+            }}
+            """
+            
+            # Combine the text prompt with the uploaded files
+            ai_contents = gemini_uploaded_files + [final_prompt]
+            
+            # Send to Gemini
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=ai_contents,
+                config=types.GenerateContentConfig(
+                    response_mime_type='application/json',
+                ),
+            )
+            
+            # Parse the real AI response
+            data = json.loads(response.text)
+            
+            # --- RENDER THE REPORT ---
+            st.success(f"Analysis Complete for: **{selected_sector}**")
+            st.divider()
+            
+            st.subheader(f"Evaluation Report: {project_title}")
+            st.write(f"**Sector Evaluated:** {selected_sector}")
+            st.write("---")
+            
+            st.markdown("### Summary Checklist for the Assessment of Proposed Projects")
+            df = pd.DataFrame(data["elements"])
+            df = df[["element_number", "element_name", "response", "score", "result_comment"]]
+            df.columns = ["No.", "Element or Requirement", "Response", "Score", "Result / Comments"]
+            
+            st.table(df)
+            
+            st.write("---")
+            st.markdown("### Summary of Scores")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric(label="Total GAD Score (Max 20)", value=data["total_score"])
+            with col2:
+                st.metric(label="Interpretation", value=data["interpretation"])
+
+            # Calculate Budget Attribution
+            score = float(data["total_score"])
+            if score < 4.0:
+                attribution = "0%"
+            elif 4.0 <= score <= 7.9:
+                attribution = "25%"
+            elif 8.0 <= score <= 14.9:
+                attribution = "50%"
+            elif 15.0 <= score <= 19.9:
+                attribution = "75%"
+            else:
+                attribution = "100%"
+                
+            st.info(f"**GAD Budget Attribution:** {attribution} of the total project cost.")
+            
+        except Exception as e:
+            st.error(f"An error occurred: {e}. Please ensure your API key is correct and try again.")
