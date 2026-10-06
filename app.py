@@ -26,7 +26,6 @@ st.write("Automated DILG Project Evaluation System")
 # ==========================================
 # 2. ENRICHED SECTOR GUIDELINES (GEWE PERMANENTLY INTEGRATED)
 # ==========================================
-# The AI will automatically apply these GEWE indicators without needing the PDFs uploaded.
 sector_guidelines = {
     "General / Multi-Sector": "Evaluate using standard Expanded Box 7. Check for cross-cutting GEWE impact indicators.",
     "Agriculture, Fisheries and Forestry": "GEWE (E-11) Focus: Track average income of small-scale producers by sex, and the number of women farmers/fisher folks awarded with instruments of recognition or land free patents.",
@@ -48,7 +47,13 @@ sector_guidelines = {
 with st.sidebar:
     st.header("Project Input")
     
-    api_key = st.text_input("Gemini API Key", type="password")
+    # --- NEW: Auto-load the API Key from Streamlit Secrets ---
+    if "GEMINI_API_KEY" in st.secrets:
+        api_key = st.secrets["GEMINI_API_KEY"]
+        st.success("API Key successfully loaded from secure settings!")
+    else:
+        api_key = st.text_input("Gemini API Key", type="password")
+    # ---------------------------------------------------------
     
     selected_sector = st.selectbox(
         "Select HGDG Sector",
@@ -68,7 +73,7 @@ with st.sidebar:
 # ==========================================
 if analyze_btn:
     if not api_key or not project_text:
-        st.error("Please enter your Gemini API Key and paste a project proposal.")
+        st.error("Please ensure the API Key is set and paste a project proposal.")
         st.stop()
         
     with st.spinner("Analyzing proposal and generating personalized GEWE assessment..."):
@@ -76,7 +81,6 @@ if analyze_btn:
             genai.configure(api_key=api_key)
             active_sector_rules = sector_guidelines[selected_sector]
             
-            # --- THE NEW PERSONALIZED PROMPT ---
             final_prompt = f"""
             You are an expert evaluator for the Department of the Interior and Local Government (DILG).
             Evaluate the provided local government project proposal using the Harmonized Gender and Development Guidelines (HGDG) Expanded Box 7.
