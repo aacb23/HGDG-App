@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 import json
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 # ==========================================
 # 1. PAGE SETUP & PRINT STYLING
@@ -47,11 +48,10 @@ sector_guidelines = {
 with st.sidebar:
     st.header("Project Input")
     
-    # The app now invisibly pulls the API key from Streamlit's hidden settings
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
     except KeyError:
-        st.error("System Error: API Key is missing from Streamlit Cloud Secrets. Please add it in the App Settings.")
+        st.error("System Error: API Key is missing from Streamlit Cloud Secrets.")
         st.stop()
     
     selected_sector = st.selectbox(
@@ -77,7 +77,8 @@ if analyze_btn:
         
     with st.spinner("Analyzing proposal and generating personalized GEWE assessment..."):
         try:
-            genai.configure(api_key=api_key)
+            # Using the modern SDK that supports AQ. keys
+            client = genai.Client(api_key=api_key)
             active_sector_rules = sector_guidelines[selected_sector]
             
             final_prompt = f"""
@@ -117,8 +118,13 @@ if analyze_btn:
             }}
             """
             
-            model = genai.GenerativeModel('gemini-1.5-flash', generation_config={"response_mime_type": "application/json"})
-            response = model.generate_content(final_prompt)
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=final_prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type='application/json',
+                ),
+            )
             
             data = json.loads(response.text)
             
