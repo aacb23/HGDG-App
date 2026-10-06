@@ -1,1 +1,1 @@
-GEMINI_API_KEY = "paste-your-long-api-key-here"
+GEMINI_API_KEY = "AQ.Ab8RN6K8P3JeRXiKTEZR2S3cqGhrqhDTIwowMCIO1bWx1iavdQ"
