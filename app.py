@@ -1,15 +1,12 @@
 import streamlit as st
 import pandas as pd
 import json
-import tempfile
-import os
-import time
 import google.generativeai as genai
 
 # ==========================================
 # 1. PAGE SETUP & PRINT STYLING
 # ==========================================
-st.set_page_config(layout="wide", page_title="HGDG & GEWE Assessment Tool")
+st.set_page_config(layout="wide", page_title="DILG HGDG Assessment Tool")
 
 hide_elements_during_print = """
     <style>
@@ -23,12 +20,13 @@ hide_elements_during_print = """
 """
 st.markdown(hide_elements_during_print, unsafe_allow_html=True)
 
-st.title("HGDG Project Design Checklist (Expanded Box 7)")
-st.write("Automated Assessment Tool integrated with GEWE Indicators")
+st.title("HGDG & GEWE Project Assessment Tool")
+st.write("Automated DILG Project Evaluation System")
 
 # ==========================================
-# 2. ENRICHED SECTOR GUIDELINES (GEWE INTEGRATED)
+# 2. ENRICHED SECTOR GUIDELINES (GEWE PERMANENTLY INTEGRATED)
 # ==========================================
+# The AI will automatically apply these GEWE indicators without needing the PDFs uploaded.
 sector_guidelines = {
     "General / Multi-Sector": "Evaluate using standard Expanded Box 7. Check for cross-cutting GEWE impact indicators.",
     "Agriculture, Fisheries and Forestry": "GEWE (E-11) Focus: Track average income of small-scale producers by sex, and the number of women farmers/fisher folks awarded with instruments of recognition or land free patents.",
@@ -57,20 +55,13 @@ with st.sidebar:
         options=list(sector_guidelines.keys())
     )
     
-    project_title = st.text_input("Project Title")
-    project_text = st.text_area("Paste Project Proposal Text Here", height=200)
+    project_title = st.text_input("Project Title", placeholder="e.g., San Clemente Rural Water Supply")
+    project_text = st.text_area("Paste Project Proposal Text Here", height=300)
     
-    st.subheader("NotebookLM / Reference Uploader")
-    uploaded_files = st.file_uploader(
-        "Upload GEWE Volumes or Local Ordinances", 
-        type=["pdf", "txt"], 
-        accept_multiple_files=True,
-        help="The AI will read these documents as its knowledge base to score the proposal."
-    )
+    st.subheader("Additional Context")
+    reference_text = st.text_area("Paste Additional Local Memos (Optional)", height=100)
     
-    reference_text = st.text_area("Paste Additional Short Context (Optional)", height=100)
-    
-    analyze_btn = st.button("Generate HGDG Checklist")
+    analyze_btn = st.button("Generate Personalized HGDG Checklist")
 
 # ==========================================
 # 4. AI LOGIC & REPORT GENERATION
@@ -80,44 +71,26 @@ if analyze_btn:
         st.error("Please enter your Gemini API Key and paste a project proposal.")
         st.stop()
         
-    with st.spinner("Reading GEWE Indicators and analyzing proposal..."):
+    with st.spinner("Analyzing proposal and generating personalized GEWE assessment..."):
         try:
-            # Connect to the stable Generative AI library
             genai.configure(api_key=api_key)
             active_sector_rules = sector_guidelines[selected_sector]
             
-            # Process Uploaded Files
-            gemini_uploaded_files = []
-            if uploaded_files:
-                for uploaded_file in uploaded_files:
-                    file_extension = ".pdf" if uploaded_file.name.endswith(".pdf") else ".txt"
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
-                        temp_file.write(uploaded_file.read())
-                        temp_path = temp_file.name
-                    
-                    st.toast(f"Uploading and processing {uploaded_file.name}...")
-                    g_file = genai.upload_file(path=temp_path)
-                    
-                    # Wait for the AI to finish processing the PDF
-                    while g_file.state.name == "PROCESSING":
-                        time.sleep(2)
-                        g_file = genai.get_file(g_file.name)
-                        
-                    gemini_uploaded_files.append(g_file)
-                    os.remove(temp_path)
-            
-            # The Enriched GEWE System Prompt
+            # --- THE NEW PERSONALIZED PROMPT ---
             final_prompt = f"""
             You are an expert evaluator for the Department of the Interior and Local Government (DILG).
             Evaluate the provided local government project proposal using the Harmonized Gender and Development Guidelines (HGDG) Expanded Box 7.
             
             CRITICAL INSTRUCTION FOR GEWE INTEGRATION:
-            You must actively cross-reference the proposal's monitoring and evaluation framework against the Gender Equality and Women's Empowerment (GEWE) Indicators.
+            You must actively evaluate the proposal's monitoring and evaluation framework against the Gender Equality and Women's Empowerment (GEWE) Indicators.
             Specifically, check if the proposal contains measurable targets that align with the GEWE Impact, Outcome 1, and Outcome 2 indicators for the selected sector.
-            If the user uploaded GEWE indicator documents, use them to validate the proposal's metrics.
             
             Sector Specific HGDG & GEWE Rules to Apply:
             {active_sector_rules}
+            
+            PERSONALIZATION INSTRUCTION:
+            The 'result_comment' for each element MUST be highly personalized to the provided text. 
+            Do NOT use generic phrases. You must directly name the specific barangay, the exact target beneficiaries, and the specific facilities/services mentioned in the proposal. Ensure your evaluation standards align with strict LGU monitoring systems like Katarungang Pambarangay compliance and the Full Disclosure Policy Portal.
             
             Additional Context:
             {reference_text}
@@ -133,7 +106,7 @@ if analyze_btn:
                   "element_name": "Involvement of women and men in project conceptualization and design",
                   "response": "Yes / Partly yes / No",
                   "score": 2.0,
-                  "result_comment": "Brief justification... Note if GEWE indicators were properly utilized."
+                  "result_comment": "Highly personalized justification..."
                 }}
               ],
               "total_score": 18.5,
@@ -141,16 +114,8 @@ if analyze_btn:
             }}
             """
             
-            ai_contents = gemini_uploaded_files + [final_prompt]
-            
-            # Generate the response using Gemini 1.5 Flash
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            response = model.generate_content(
-                ai_contents,
-                generation_config=genai.GenerationConfig(
-                    response_mime_type="application/json"
-                )
-            )
+            model = genai.GenerativeModel('gemini-1.5-flash', generation_config={"response_mime_type": "application/json"})
+            response = model.generate_content(final_prompt)
             
             data = json.loads(response.text)
             
