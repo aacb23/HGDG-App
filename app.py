@@ -1,8 +1,7 @@
 import streamlit as st
 import pandas as pd
 import json
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 
 # ==========================================
 # 1. PAGE SETUP & PRINT STYLING
@@ -48,10 +47,11 @@ sector_guidelines = {
 with st.sidebar:
     st.header("Project Input")
     
+    # The app now invisibly pulls the API key from Streamlit's hidden settings
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
     except KeyError:
-        st.error("System Error: API Key is missing from Streamlit Cloud Secrets.")
+        st.error("System Error: API Key is missing from Streamlit Cloud Secrets. Please add it in the App Settings.")
         st.stop()
     
     selected_sector = st.selectbox(
@@ -77,8 +77,7 @@ if analyze_btn:
         
     with st.spinner("Analyzing proposal and generating personalized GEWE assessment..."):
         try:
-            # Using the modern SDK that supports AQ. keys
-            client = genai.Client(api_key=api_key)
+            genai.configure(api_key=api_key)
             active_sector_rules = sector_guidelines[selected_sector]
             
             final_prompt = f"""
@@ -118,13 +117,10 @@ if analyze_btn:
             }}
             """
             
-            response = client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=final_prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type='application/json',
-                ),
-            )
+            # --- UPDATED LINE: Pointing to Google's newest model! ---
+            model = genai.GenerativeModel('gemini-3.8-flash', generation_config={"response_mime_type": "application/json"})
+            
+            response = model.generate_content(final_prompt)
             
             data = json.loads(response.text)
             
@@ -148,23 +144,4 @@ if analyze_btn:
             
             col1, col2 = st.columns(2)
             with col1:
-                st.metric(label="Total GAD Score (Max 20)", value=data["total_score"])
-            with col2:
-                st.metric(label="Interpretation", value=data["interpretation"])
-
-            score = float(data["total_score"])
-            if score < 4.0:
-                attribution = "0%"
-            elif 4.0 <= score <= 7.9:
-                attribution = "25%"
-            elif 8.0 <= score <= 14.9:
-                attribution = "50%"
-            elif 15.0 <= score <= 19.9:
-                attribution = "75%"
-            else:
-                attribution = "100%"
-                
-            st.info(f"**GAD Budget Attribution:** {attribution} of the total project cost.")
-            
-        except Exception as e:
-            st.error(f"An error occurred: {e}. Please ensure your API key is correct and try again.")
+                st.metric(label="Total GAD Score (Max
