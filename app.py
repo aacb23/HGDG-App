@@ -144,4 +144,23 @@ if analyze_btn:
             
             col1, col2 = st.columns(2)
             with col1:
-                st.metric(label="Total GAD Score (Max
+                st.metric(label="Total GAD Score (Max 20)", value=data["total_score"])
+            with col2:
+                st.metric(label="Interpretation", value=data["interpretation"])
+
+            score = float(data["total_score"])
+            if score < 4.0:
+                attribution = "0%"
+            elif 4.0 <= score <= 7.9:
+                attribution = "25%"
+            elif 8.0 <= score <= 14.9:
+                attribution = "50%"
+            elif 15.0 <= score <= 19.9:
+                attribution = "75%"
+            else:
+                attribution = "100%"
+                
+            st.info(f"**GAD Budget Attribution:** {attribution} of the total project cost.")
+            
+        except Exception as e:
+            st.error(f"An error occurred: {e}. Please ensure your API key is correct and try again.")
