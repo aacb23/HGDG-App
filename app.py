@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import json
-import time  # <-- NEW: Added the time library so the app knows how to 'wait'
+import time
 from google import genai
 from google.genai import types
 
@@ -118,65 +118,4 @@ if analyze_btn:
             }}
             """
             
-            # --- NEW: The Auto-Retry Loop ---
-            max_retries = 3
-            for attempt in range(max_retries):
-                try:
-                    response = client.models.generate_content(
-                        model='gemini-3.8-flash',
-                        contents=final_prompt,
-                        config=types.GenerateContentConfig(
-                            response_mime_type='application/json',
-                        ),
-                    )
-                    break # If successful, break out of the loop!
-                except Exception as api_e:
-                    if "503" in str(api_e) and attempt < max_retries - 1:
-                        time.sleep(5) # Wait 5 seconds, then try again
-                        continue
-                    else:
-                        raise api_e # If it fails 3 times, show the error
-            # --------------------------------
-            
-            data = json.loads(response.text)
-            
-            # --- RENDER THE REPORT ---
-            st.success(f"Analysis Complete for: **{selected_sector}**")
-            st.divider()
-            
-            st.subheader(f"Evaluation Report: {project_title}")
-            st.write(f"**Sector Evaluated:** {selected_sector}")
-            st.write("---")
-            
-            st.markdown("### Summary Checklist for the Assessment of Proposed Projects")
-            df = pd.DataFrame(data["elements"])
-            df = df[["element_number", "element_name", "response", "score", "result_comment"]]
-            df.columns = ["No.", "Element or Requirement", "Response", "Score", "Result / Comments"]
-            
-            st.table(df)
-            
-            st.write("---")
-            st.markdown("### Summary of Scores")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric(label="Total GAD Score (Max 20)", value=data["total_score"])
-            with col2:
-                st.metric(label="Interpretation", value=data["interpretation"])
-
-            score = float(data["total_score"])
-            if score < 4.0:
-                attribution = "0%"
-            elif 4.0 <= score <= 7.9:
-                attribution = "25%"
-            elif 8.0 <= score <= 14.9:
-                attribution = "50%"
-            elif 15.0 <= score <= 19.9:
-                attribution = "75%"
-            else:
-                attribution = "100%"
-                
-            st.info(f"**GAD Budget Attribution:** {attribution} of the total project cost.")
-            
-        except Exception as e:
-            st.error(f"An error occurred: {e}. Please ensure your API key is correct and try again.")
+            # --- AUTO-RETRY LOOP &
