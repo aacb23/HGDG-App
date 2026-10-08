@@ -104,18 +104,4 @@ if analyze_btn:
             
             You MUST output your evaluation in valid JSON format with this EXACT structure:
             {{
-              "elements": [
-                {{
-                  "element_number": 1,
-                  "element_name": "Involvement of women and men in project conceptualization and design",
-                  "response": "Yes / Partly yes / No",
-                  "score": 2.0,
-                  "result_comment": "Highly personalized justification..."
-                }}
-              ],
-              "total_score": 18.5,
-              "interpretation": "Gender-responsive"
-            }}
-            """
-            
-            # --- AUTO-RETRY LOOP &
+              "elements":
