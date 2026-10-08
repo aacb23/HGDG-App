@@ -118,12 +118,12 @@ if analyze_btn:
             }}
             """
             
-            # --- AUTO-RETRY LOOP & 2.0-FLASH MODEL ---
+            # --- AUTO-RETRY LOOP & 3.8-FLASH MODEL ---
             max_retries = 3
             for attempt in range(max_retries):
                 try:
                     response = client.models.generate_content(
-                        model='gemini-2.0-flash',
+                        model='gemini-3.8-flash',
                         contents=final_prompt,
                         config=types.GenerateContentConfig(
                             response_mime_type='application/json',
