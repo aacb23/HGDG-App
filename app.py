@@ -57,4 +57,23 @@ with st.sidebar:
     
     selected_sector = st.selectbox(
         "Select HGDG Sector",
-        options=list(sector_guidelines.keys
+        options=list(sector_guidelines.keys())
+    )
+    
+    project_title = st.text_input("Project Title", placeholder="e.g., Rural Water Supply")
+    project_text = st.text_area("Paste Project Proposal Text Here", height=300)
+    
+    st.subheader("Additional Context")
+    reference_text = st.text_area("Paste Additional Local Memos (Optional)", height=100)
+    
+    analyze_btn = st.button("Generate Personalized HGDG Checklist")
+
+# ==========================================
+# 4. AI LOGIC & REPORT GENERATION
+# ==========================================
+if analyze_btn:
+    if not api_key or not project_text:
+        st.error("Please ensure the API Key is set and paste a project proposal.")
+        st.stop()
+        
+    with st.spinner("Analyzing proposal and generating personalized GEWE assessment...
