@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import json
+import time  # <-- NEW: Added the time library so the app knows how to 'wait'
 from google import genai
 from google.genai import types
 
@@ -77,7 +78,6 @@ if analyze_btn:
         
     with st.spinner("Analyzing proposal and generating personalized GEWE assessment..."):
         try:
-            # Initialize the modern client
             client = genai.Client(api_key=api_key)
             active_sector_rules = sector_guidelines[selected_sector]
             
@@ -118,14 +118,25 @@ if analyze_btn:
             }}
             """
             
-            # Generate the content using the updated 3.8-flash model
-            response = client.models.generate_content(
-                model='gemini-3.8-flash',
-                contents=final_prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type='application/json',
-                ),
-            )
+            # --- NEW: The Auto-Retry Loop ---
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    response = client.models.generate_content(
+                        model='gemini-3.8-flash',
+                        contents=final_prompt,
+                        config=types.GenerateContentConfig(
+                            response_mime_type='application/json',
+                        ),
+                    )
+                    break # If successful, break out of the loop!
+                except Exception as api_e:
+                    if "503" in str(api_e) and attempt < max_retries - 1:
+                        time.sleep(5) # Wait 5 seconds, then try again
+                        continue
+                    else:
+                        raise api_e # If it fails 3 times, show the error
+            # --------------------------------
             
             data = json.loads(response.text)
             
