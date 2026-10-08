@@ -7,7 +7,7 @@ from google.genai import types
 # ==========================================
 # 1. PAGE SETUP & PRINT STYLING
 # ==========================================
-st.set_page_config(layout="wide", page_title="HGDG Assessment Tool")
+st.set_page_config(layout="wide", page_title="DILG HGDG Assessment Tool")
 
 hide_elements_during_print = """
     <style>
@@ -21,34 +21,25 @@ hide_elements_during_print = """
 """
 st.markdown(hide_elements_during_print, unsafe_allow_html=True)
 
-st.title("HGDG Project Design Checklist (Expanded Box 7)")
-st.write("Automated Assessment Tool for Local Government Units")
+st.title("HGDG & GEWE Project Assessment Tool")
+st.write("Automated DILG Project Evaluation System")
 
 # ==========================================
-# 2. SECTOR GUIDELINES DICTIONARY
+# 2. ENRICHED SECTOR GUIDELINES (GEWE PERMANENTLY INTEGRATED)
 # ==========================================
 sector_guidelines = {
-    "General / Multi-Sector": "Evaluate using the standard Expanded Box 7 guidelines.",
-    "Agriculture and Agrarian Reform": "Focus on access to agricultural inputs (seeds, credit, land titles) for women. Verify if extension services target female farmers.",
-    "Natural Resource Management": "Focus on women's access to and control over forest, water, and marine resources, and participation in environmental management.",
-    "Infrastructure": "Focus strictly on physical welfare, access to the facility, and employment generated. Verify mitigating strategies for displacement.",
-    "Private Sector Development": "Evaluate support for women-owned enterprises, access to non-loan resources, and market linkages.",
-    "Education": "Assess school participation rates by sex, gender-sensitive curricula, and female leadership in the education sector.",
-    "Health": "Focus on maternal health, reproductive health services, and the gender-sensitive delivery of quality health programs.",
-    "Housing and Settlement": "Evaluate women's access to housing units, deeds/titles, and participation in homeowner associations.",
-    "Women in Areas under Armed Conflict": "Assess gender-responsive services in refugee camps, security from violence, and participation in peace negotiations.",
-    "Justice": "Focus on women's access to legal services, handling of violence against women (VAW) cases, and gender-sensitivity of legal personnel.",
-    "Information and Communication Technologies (ICT)": "Assess women's access to ICT training, tech employment, and gender-responsive digital content.",
-    "Microfinance": "Evaluate women's access to loans, financial literacy training, and actual control over loan usage.",
-    "Labor and Employment": "Focus on equal opportunity employment, workplace safety, anti-sexual harassment mechanisms, and leadership roles.",
-    "Child Labor": "Assess interventions targeting girl and boy child laborers, rehabilitation, and education access.",
-    "Migration": "Evaluate protection mechanisms for female migrants, safe remittance channels, and reintegration programs.",
-    "Funding Facilities": "Assess the integration of GAD criteria in the evaluation and selection of projects for facility funding.",
-    "Disaster Risk Reduction and Management (DRRM)": "Focus on gender-specific vulnerabilities, women's participation in DRRM councils, and gender-responsive relief.",
-    "Energy": "Evaluate women's access to energy resources, participation in rural electrification, and related livelihood impacts.",
-    "Fisheries": "Assess women's roles in pre- and post-harvest fishing activities, access to fishing tech, and coastal resource management.",
-    "Tourism": "Focus on women's employment in tourism, protection from exploitation, and support for women-led cultural enterprises.",
-    "Development Planning": "Assess the integration of gender analysis into local/regional development plans and GAD budget allocations."
+    "General / Multi-Sector": "Evaluate using standard Expanded Box 7. Check for cross-cutting GEWE impact indicators.",
+    "Agriculture, Fisheries and Forestry": "GEWE (E-11) Focus: Track average income of small-scale producers by sex, and the number of women farmers/fisher folks awarded with instruments of recognition or land free patents.",
+    "Infrastructure": "GEWE (E-17) Focus: Track the percentage of employed women in the infrastructure sector, and proportion of women with convenient access to safe drinking water, electricity, and public transport.",
+    "Disaster Risk Reduction and Management (DRRM-CCA)": "GEWE (D-10) Focus: Track the ratio of female to male persons affected by a disaster who received assistance, and the incidence of GBV/VAW in times of natural disasters.",
+    "Access to Justice": "GEWE (B-6) Focus: Track the extent of recovery and reintegration of women/children survivors of GBV, and the attrition level of VAWC-related cases.",
+    "Formal Labor": "GEWE (E-14) Focus: Track the Labor Force Participation Rate by sex, gender gap in wages, and incidence of gender-based violence in the workplace.",
+    "Informal Economy": "GEWE (E-15) Focus: Track the share of women in informal non-agriculture employment, and the proportion of formal loans granted to women entrepreneurs.",
+    "MSMEs, Trade and Industry": "GEWE (E-12) Focus: Track the proportion of firms owned by women by size, and average monthly income of women in business and entrepreneurship.",
+    "Tourism": "GEWE (E-13) Focus: Track the prevalence of GBV against women tourists/workers, and the proportion of women workers reporting specific improvements in situations.",
+    "Health": "GEWE (A-2) Focus: Track maternal mortality ratio, unmet need for family planning, and coverage of essential health services for disadvantaged populations.",
+    "Education": "GEWE (A-1) Focus: Track completion and cohort survival rates by sex, and the proportion of reported cases of discrimination against female students/faculty resolved.",
+    "Women in Bureaucracy, Politics and Governance": "GEWE (C-8) Focus: Track the proportion of seats occupied by women in local and national governing boards and decision-making bodies."
 }
 
 # ==========================================
@@ -57,48 +48,53 @@ sector_guidelines = {
 with st.sidebar:
     st.header("Project Input")
     
-    # Secure API Key Input
-    api_key = st.text_input("Gemini API Key", type="password", help="Get this from Google AI Studio")
+    try:
+        api_key = st.secrets["GEMINI_API_KEY"]
+    except KeyError:
+        st.error("System Error: API Key is missing from Streamlit Cloud Secrets.")
+        st.stop()
     
     selected_sector = st.selectbox(
         "Select HGDG Sector",
         options=list(sector_guidelines.keys())
     )
     
-    project_title = st.text_input("Project Title")
-    project_text = st.text_area("Paste Project Proposal Text Here", height=250)
+    project_title = st.text_input("Project Title", placeholder="e.g., San Clemente Rural Water Supply")
+    project_text = st.text_area("Paste Project Proposal Text Here", height=300)
     
     st.subheader("Additional Context")
-    reference_text = st.text_area("Paste Additional Local Memos/Ordinances (Optional)", height=150)
+    reference_text = st.text_area("Paste Additional Local Memos (Optional)", height=100)
     
-    analyze_btn = st.button("Generate HGDG Checklist")
+    analyze_btn = st.button("Generate Personalized HGDG Checklist")
 
 # ==========================================
 # 4. AI LOGIC & REPORT GENERATION
 # ==========================================
 if analyze_btn:
-    if not api_key:
-        st.error("Please enter your Gemini API Key in the sidebar.")
-        st.stop()
-    if not project_text:
-        st.error("Please paste a project proposal.")
+    if not api_key or not project_text:
+        st.error("Please ensure the API Key is set and paste a project proposal.")
         st.stop()
         
-    with st.spinner("Analyzing proposal against DILG & HGDG guidelines... This takes about 10 seconds."):
+    with st.spinner("Analyzing proposal and generating personalized GEWE assessment..."):
         try:
-            # Initialize the AI Client
+            # Using the modern SDK that supports AQ. keys
             client = genai.Client(api_key=api_key)
             active_sector_rules = sector_guidelines[selected_sector]
             
-            # Build the strict prompt
             final_prompt = f"""
             You are an expert evaluator for the Department of the Interior and Local Government (DILG).
-            Evaluate the provided local government project proposal using the Harmonized Gender and Development Guidelines (HGDG).
+            Evaluate the provided local government project proposal using the Harmonized Gender and Development Guidelines (HGDG) Expanded Box 7.
             
-            Evaluate against the 10 core elements of the HGDG Box 7. Assign a score of 0 (No), a partial score (Partly Yes), or the maximum score (Yes).
+            CRITICAL INSTRUCTION FOR GEWE INTEGRATION:
+            You must actively evaluate the proposal's monitoring and evaluation framework against the Gender Equality and Women's Empowerment (GEWE) Indicators.
+            Specifically, check if the proposal contains measurable targets that align with the GEWE Impact, Outcome 1, and Outcome 2 indicators for the selected sector.
             
-            Sector Specific Rules to Apply:
+            Sector Specific HGDG & GEWE Rules to Apply:
             {active_sector_rules}
+            
+            PERSONALIZATION INSTRUCTION:
+            The 'result_comment' for each element MUST be highly personalized to the provided text. 
+            Do NOT use generic phrases. You must directly name the specific barangay, the exact target beneficiaries, and the specific facilities/services mentioned in the proposal. Ensure your evaluation standards align with strict LGU monitoring systems like Katarungang Pambarangay compliance and the Full Disclosure Policy Portal.
             
             Additional Context:
             {reference_text}
@@ -114,7 +110,7 @@ if analyze_btn:
                   "element_name": "Involvement of women and men in project conceptualization and design",
                   "response": "Yes / Partly yes / No",
                   "score": 2.0,
-                  "result_comment": "Brief justification based on the text..."
+                  "result_comment": "Highly personalized justification..."
                 }}
               ],
               "total_score": 18.5,
@@ -122,7 +118,6 @@ if analyze_btn:
             }}
             """
             
-            # Send to Gemini and enforce JSON format
             response = client.models.generate_content(
                 model='gemini-2.5-flash',
                 contents=final_prompt,
@@ -131,7 +126,6 @@ if analyze_btn:
                 ),
             )
             
-            # Parse the real AI response
             data = json.loads(response.text)
             
             # --- RENDER THE REPORT ---
@@ -158,7 +152,6 @@ if analyze_btn:
             with col2:
                 st.metric(label="Interpretation", value=data["interpretation"])
 
-            # Calculate Budget Attribution
             score = float(data["total_score"])
             if score < 4.0:
                 attribution = "0%"
