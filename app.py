@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 import json
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 # ==========================================
 # 1. PAGE SETUP & PRINT STYLING
@@ -47,7 +48,6 @@ sector_guidelines = {
 with st.sidebar:
     st.header("Project Input")
     
-    # The app now invisibly pulls the API key from Streamlit's hidden settings
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
     except KeyError:
@@ -59,7 +59,7 @@ with st.sidebar:
         options=list(sector_guidelines.keys())
     )
     
-    project_title = st.text_input("Project Title", placeholder="e.g., San Clemente Rural Water Supply")
+    project_title = st.text_input("Project Title", placeholder="e.g., Rural Water Supply")
     project_text = st.text_area("Paste Project Proposal Text Here", height=300)
     
     st.subheader("Additional Context")
@@ -77,7 +77,8 @@ if analyze_btn:
         
     with st.spinner("Analyzing proposal and generating personalized GEWE assessment..."):
         try:
-            genai.configure(api_key=api_key)
+            # Initialize the modern client
+            client = genai.Client(api_key=api_key)
             active_sector_rules = sector_guidelines[selected_sector]
             
             final_prompt = f"""
@@ -93,7 +94,7 @@ if analyze_btn:
             
             PERSONALIZATION INSTRUCTION:
             The 'result_comment' for each element MUST be highly personalized to the provided text. 
-            Do NOT use generic phrases. You must directly name the specific barangay, the exact target beneficiaries, and the specific facilities/services mentioned in the proposal. Ensure your evaluation standards align with strict LGU monitoring systems like Katarungang Pambarangay compliance and the Full Disclosure Policy Portal.
+            Do NOT use generic phrases. You must directly name the specific location, the exact target beneficiaries, and the specific facilities/services mentioned in the proposal. Ensure your evaluation standards align with strict LGU monitoring systems like Katarungang Pambarangay compliance and the Full Disclosure Policy Portal.
             
             Additional Context:
             {reference_text}
@@ -117,10 +118,14 @@ if analyze_btn:
             }}
             """
             
-            # --- UPDATED LINE: Pointing to Google's newest model! ---
-            model = genai.GenerativeModel('gemini-3.8-flash', generation_config={"response_mime_type": "application/json"})
-            
-            response = model.generate_content(final_prompt)
+            # Generate the content using the updated 3.8-flash model
+            response = client.models.generate_content(
+                model='gemini-3.8-flash',
+                contents=final_prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type='application/json',
+                ),
+            )
             
             data = json.loads(response.text)
             
