@@ -76,4 +76,107 @@ if analyze_btn:
         st.error("Please ensure the API Key is set and paste a project proposal.")
         st.stop()
         
-    with st.spinner("Analyzing proposal and generating personalized GEWE assessment...
+    with st.spinner("Analyzing proposal and generating personalized GEWE assessment..."):
+        try:
+            client = genai.Client(api_key=api_key)
+            active_sector_rules = sector_guidelines[selected_sector]
+            
+            final_prompt = f"""
+            You are an expert evaluator for the Department of the Interior and Local Government (DILG).
+            Evaluate the provided local government project proposal using the Harmonized Gender and Development Guidelines (HGDG) Expanded Box 7.
+            
+            CRITICAL INSTRUCTION FOR GEWE INTEGRATION:
+            You must actively evaluate the proposal's monitoring and evaluation framework against the Gender Equality and Women's Empowerment (GEWE) Indicators.
+            Specifically, check if the proposal contains measurable targets that align with the GEWE Impact, Outcome 1, and Outcome 2 indicators for the selected sector.
+            
+            Sector Specific HGDG & GEWE Rules to Apply:
+            {active_sector_rules}
+            
+            PERSONALIZATION INSTRUCTION:
+            The 'result_comment' for each element MUST be highly personalized to the provided text. 
+            Do NOT use generic phrases. You must directly name the specific location, the exact target beneficiaries, and the specific facilities/services mentioned in the proposal. Ensure your evaluation standards align with strict LGU monitoring systems like Katarungang Pambarangay compliance and the Full Disclosure Policy Portal.
+            
+            Additional Context:
+            {reference_text}
+            
+            Project Proposal:
+            {project_text}
+            
+            You MUST output your evaluation in valid JSON format with this EXACT structure:
+            {{
+              "elements": [
+                {{
+                  "element_number": 1,
+                  "element_name": "Involvement of women and men in project conceptualization and design",
+                  "response": "Yes / Partly yes / No",
+                  "score": 2.0,
+                  "result_comment": "Highly personalized justification..."
+                }}
+              ],
+              "total_score": 18.5,
+              "interpretation": "Gender-responsive"
+            }}
+            """
+            
+            # --- AUTO-RETRY LOOP & 2.0-FLASH MODEL ---
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    response = client.models.generate_content(
+                        model='gemini-2.0-flash',
+                        contents=final_prompt,
+                        config=types.GenerateContentConfig(
+                            response_mime_type='application/json',
+                        ),
+                    )
+                    break 
+                except Exception as api_e:
+                    if "503" in str(api_e) and attempt < max_retries - 1:
+                        time.sleep(5) 
+                        continue
+                    else:
+                        raise api_e 
+            # --------------------------------
+            
+            data = json.loads(response.text)
+            
+            # --- RENDER THE REPORT ---
+            st.success(f"Analysis Complete for: **{selected_sector}**")
+            st.divider()
+            
+            st.subheader(f"Evaluation Report: {project_title}")
+            st.write(f"**Sector Evaluated:** {selected_sector}")
+            st.write("---")
+            
+            st.markdown("### Summary Checklist for the Assessment of Proposed Projects")
+            df = pd.DataFrame(data["elements"])
+            df = df[["element_number", "element_name", "response", "score", "result_comment"]]
+            df.columns = ["No.", "Element or Requirement", "Response", "Score", "Result / Comments"]
+            
+            st.table(df)
+            
+            st.write("---")
+            st.markdown("### Summary of Scores")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric(label="Total GAD Score (Max 20)", value=data["total_score"])
+            with col2:
+                st.metric(label="Interpretation", value=data["interpretation"])
+
+            score = float(data["total_score"])
+            if score < 4.0:
+                attribution = "0%"
+            elif 4.0 <= score <= 7.9:
+                attribution = "25%"
+            elif 8.0 <= score <= 14.9:
+                attribution = "50%"
+            elif 15.0 <= score <= 19.9:
+                attribution = "75%"
+            else:
+                attribution = "100%"
+                
+            st.info(f"**GAD Budget Attribution:** {attribution} of the total project cost.")
+            
+        except Exception as e:
+            st.error(f"An error occurred: {e}. Please ensure your API key is correct and try again.")
