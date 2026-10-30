@@ -59,7 +59,7 @@ corporate_purple_styling = """
 st.markdown(corporate_purple_styling, unsafe_allow_html=True)
 
 st.title("HGDG Planning Tool")
-st.write("**Automated Gender Analysis Tool for Programs and Project**")
+st.write("**Automated Gender Analysis Tool for Programs and Projects**")
 
 # ==========================================
 # 2. ENRICHED SECTOR GUIDELINES (GEWE PERMANENTLY INTEGRATED)
