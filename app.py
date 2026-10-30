@@ -6,12 +6,48 @@ from google import genai
 from google.genai import types
 
 # ==========================================
-# 1. PAGE SETUP & PRINT STYLING
+# 1. PAGE SETUP & CORPORATE STYLING
 # ==========================================
-st.set_page_config(layout="wide", page_title="DILG HGDG Assessment Tool")
+st.set_page_config(layout="wide", page_title="HGDG Planning Tool")
 
-hide_elements_during_print = """
+corporate_purple_styling = """
     <style>
+    /* Corporate Purple Accents */
+    h1 {
+        color: #4A148C !important;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    /* Primary Button Styling */
+    div.stButton > button:first-child {
+        background-color: #5E35B1;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    div.stButton > button:first-child:hover {
+        background-color: #4527A0;
+        color: white;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    /* Sidebar Customization */
+    [data-testid="stSidebar"] {
+        background-color: #F8F4FA;
+        border-right: 1px solid #E1BEE7;
+    }
+    
+    /* Metrics and Dividers */
+    [data-testid="stMetricValue"] {
+        color: #5E35B1;
+    }
+    hr {
+        border-bottom: 2px solid #E1BEE7;
+    }
+
+    /* Print Formatting */
     @media print {
         [data-testid="stSidebar"] { display: none !important; }
         header { display: none !important; }
@@ -20,10 +56,10 @@ hide_elements_during_print = """
     }
     </style>
 """
-st.markdown(hide_elements_during_print, unsafe_allow_html=True)
+st.markdown(corporate_purple_styling, unsafe_allow_html=True)
 
-st.title("HGDG & GEWE Project Assessment Tool")
-st.write("Automated DILG Project Evaluation System")
+st.title("HGDG Planning Tool")
+st.write("**Automated Gender Analysis Tool for Programs and Project**")
 
 # ==========================================
 # 2. ENRICHED SECTOR GUIDELINES (GEWE PERMANENTLY INTEGRATED)
@@ -142,7 +178,6 @@ if analyze_btn:
             
             # --- RENDER THE REPORT ---
             st.success(f"Analysis Complete for: **{selected_sector}**")
-            st.divider()
             
             st.subheader(f"Evaluation Report: {project_title}")
             st.write(f"**Sector Evaluated:** {selected_sector}")
